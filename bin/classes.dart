@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-
 import 'package:crypto/crypto.dart';
 
-
+bool constantDifficulty = false;
 
 class Block {
   String? hash;
@@ -52,7 +52,7 @@ class Block {
     }.toString();
   }
 
-    void add(Block child) {
+  void add(Block child) {
     children.add(child);
   }
 
@@ -123,12 +123,24 @@ String proofOfWork(Block block) {
   return computedHash;
 }
 
+extension ConvertHexaToBinary on String {
+  String toBin() {
+    String output = '';
+    split('').forEach((letter) {
+      output += int.parse(letter, radix: 16).toRadixString(2).padLeft(4, '0');
+    });
+    return output;
+  }
+}
+
 int findNonce(Block block) {
   block.blockHeader.nonce = 0;
   String computedHash = block.computeHash();
-  while (!computedHash.startsWith('0' * block.blockHeader.difficulty!)) {
+  String binaryHash = computedHash.toBin();
+  while (!binaryHash.startsWith('0' * block.blockHeader.difficulty!)) {
     block.blockHeader.nonce += 1;
     computedHash = block.computeHash();
+    binaryHash = computedHash.toBin();
   }
   return block.blockHeader.nonce;
 }
@@ -193,17 +205,17 @@ const minRate = 1;
 class Blockchain {
   //this is the root block
   Block? genesisBlock;
+  int blockCount = 0;
 
   Blockchain() {
     generateGenesisBlock();
     // while (true) {
-    for (int i = 0; i < 10; i++) {   
+    for (int i = 0; i < 10; i++) {
       Block lastBlock = getLastBlock();
       Block newBlock = mineNewBlock(lastBlock);
-      
+
       //adding the new block to the blockchain
       lastBlock.appendAt(lastBlock, newBlock);
-      
     }
 
     genesisBlock!.traverseDepthFirst((node) => print(node));
@@ -218,41 +230,54 @@ class Blockchain {
         timestamp: DateTime.now(),
       ),
     );
-    int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
-    newBlock.blockHeader.difficulty = newDifficulty;
-    //newBlock.blockHeader.difficulty = 4;
+    if (constantDifficulty) {
+      newBlock.blockHeader.difficulty = 4;
+    } else {
+      int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
+      newBlock.blockHeader.difficulty = newDifficulty;
+    }
     newBlock.blockHeader.nonce = findNonce(newBlock);
     newBlock.hash = newBlock.computeHash();
     newBlock.blockHeight = lastBlock.blockHeight! + 1;
+
+    blockCount++;
     return newBlock;
   }
 
   Block getLastBlock() {
     genesisBlock!.getLevels();
     Block lastBlock = (genesisBlock!.getLastNodes()
-          ..sort((Block a, Block b) => (a)
-              .blockHeader
-              .timestamp
-              .compareTo((b).blockHeader.timestamp)))
+          ..sort((Block a, Block b) =>
+              (a).blockHeader.timestamp.compareTo((b).blockHeader.timestamp)))
         .last;
     return lastBlock;
   }
 
   int difficultyRetargetting(Block lastBlock, Block newBlock) {
     int newDifficulty = lastBlock.blockHeader.difficulty!;
-    
-    Duration difference = newBlock.blockHeader.timestamp
-        .difference(lastBlock.blockHeader.timestamp);
-    Duration minRateDuration = Duration(seconds: minRate);
-    if (difference.compareTo(minRateDuration) < 0) {
-      newDifficulty += 1;
-    } else if (lastBlock.blockHeader.difficulty! - 1 > 0) {
-      //newDifficulty -= 1;
-      newDifficulty =((newDifficulty / difference.inSeconds.toInt()).ceil()).toInt();
+    int secondsPassed = DateTime.now()
+        .difference(genesisBlock!.blockHeader.timestamp)
+        .inSeconds;
+
+    if (blockCount > secondsPassed) {
+      newDifficulty++;
+    } else if (blockCount < secondsPassed && newDifficulty - 1 > 0) {
+      newDifficulty--;
     }
+
+    // Duration difference = newBlock.blockHeader.timestamp
+    //     .difference(lastBlock.blockHeader.timestamp);
+    // Duration minRateDuration = Duration(seconds: minRate);
+    // // if difference between new timestamp and last timestamp is less than minRate
+    // if (difference.compareTo(minRateDuration) < 0) {
+    //   newDifficulty += 1;
+    // } else if (lastBlock.blockHeader.difficulty! - 1 > 0) {
+    //   // newDifficulty -= 1;
+    //   newDifficulty =
+    //       ((newDifficulty / difference.inSeconds.toInt()).ceil()).toInt();
+    // }
     return newDifficulty;
   }
-
 
   void generateGenesisBlock() {
     genesisBlock = Block(
@@ -262,7 +287,7 @@ class Blockchain {
       ),
     );
     genesisBlock!.blockHeight = 0;
-    genesisBlock!.blockHeader.difficulty = 2;
+    genesisBlock!.blockHeader.difficulty = 16;
     genesisBlock!.transactionsList.clear();
     genesisBlock!.blockHeader.nonce = findNonce(genesisBlock!);
     genesisBlock!.hash = genesisBlock!.computeHash();
