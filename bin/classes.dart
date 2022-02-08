@@ -163,14 +163,13 @@ class Blockchain {
       }
       newBlock.blockHeader.difficulty = newDifficulty;
       newBlock.blockHeader.nonce = findNonce(newBlock);
-      newBlock.hash = proofOfWork(newBlock);
+      newBlock.hash = newBlock.computeHash();
 
       TreeNode newBlockTreeNode = TreeNode(newBlock);
 
       lastBlockTreeNode.appendAt(lastBlockTreeNode, newBlockTreeNode);
       root!.getLevels();
-      int blockHeight = newBlockTreeNode.getHeight();
-      newBlock.blockHeight = blockHeight;
+      newBlock.blockHeight = lastBlock.blockHeight! + 1;
     }
 
     root!.traverseDepthFirst((node) => print(node.block));
