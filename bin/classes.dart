@@ -1,20 +1,23 @@
 import 'dart:convert';
 import 'dart:math';
 
+
 import 'package:crypto/crypto.dart';
 
-import 'tree.dart';
+
 
 class Block {
   String? hash;
   int? blockHeight;
   BlockHeader blockHeader;
   List<Transaction> transactionsList;
+  List<Block> children = [];
+  static Map<Block, int> levels = {};
 
   Block({
     required this.blockHeader,
   }) : transactionsList =
-            List.generate(3, (i) => Transaction.randomTransaction()) {}
+            List.generate(3, (i) => Transaction.randomTransaction());
 
   String computeHash() {
     String concatenatedBlockHeader = blockHeader.previousHash +
@@ -47,6 +50,66 @@ class Block {
       'transactionList': transactionsList,
       'blockHeader': blockHeader,
     }.toString();
+  }
+
+    void add(Block child) {
+    children.add(child);
+  }
+
+  Block? getNode(String hash) {
+    if (this.hash == hash) return this;
+
+    for (final child in children) {
+      if (child.getNode(hash) != null) return child.getNode(hash);
+    }
+    return null;
+  }
+
+  void getLevels({int level = 0}) {
+    levels[this] = level++;
+    for (final child in children) {
+      child.getLevels(level: level);
+    }
+  }
+
+  int getHeight() {
+    return levels[this] as int;
+  }
+
+  List<Block> getLastNodes() {
+    int maxLevel = -1;
+    levels.forEach((key, value) {
+      if (value > maxLevel) maxLevel = value;
+    });
+
+    List<Block> lastNodes = [];
+    levels.forEach((key, value) {
+      if (value == maxLevel) lastNodes.add(key);
+    });
+    return lastNodes;
+  }
+
+  void appendAt(Block? targetNode, Block newNode) {
+    targetNode?.children.add(newNode);
+  }
+
+  int countNodes() {
+    int n = 0;
+    if (children.isEmpty) {
+      return 1;
+    } else {
+      for (final child in children) {
+        n += child.countNodes();
+      }
+    }
+    return n + 1;
+  }
+
+  void traverseDepthFirst(void Function(Block node) performAction) {
+    performAction(this);
+    for (final child in children) {
+      child.traverseDepthFirst(performAction);
+    }
   }
 }
 
@@ -128,56 +191,68 @@ class Transaction {
 const minRate = 1;
 
 class Blockchain {
-  TreeNode? root;
+  //this is the root block
   Block? genesisBlock;
 
   Blockchain() {
     generateGenesisBlock();
-    root = TreeNode(genesisBlock!);
     // while (true) {
-    for (int i = 0; i < 10; i++) {
-      root!.getLevels();
-      TreeNode lastBlockTreeNode = (root!.getLastNodes()
-            ..sort((TreeNode a, TreeNode b) => (a.block)
-                .blockHeader
-                .timestamp
-                .compareTo((b.block).blockHeader.timestamp)))
-          .last;
-      Block lastBlock = lastBlockTreeNode.block;
-      Block newBlock = Block(
-        blockHeader: BlockHeader(
-          previousHash: lastBlock.hash!,
-          timestamp: DateTime.now(),
-        ),
-      );
-
-      int newDifficulty = lastBlock.blockHeader.difficulty!;
-
-      Duration difference = newBlock.blockHeader.timestamp
-          .difference(lastBlock.blockHeader.timestamp);
-      Duration minRateDuration = Duration(seconds: minRate);
-      if (difference.compareTo(minRateDuration) < 0) {
-        newDifficulty += 1;
-      } else if (lastBlock.blockHeader.difficulty! - 1 > 0) {
-        newDifficulty -= 1;
-      }
-      newBlock.blockHeader.difficulty = newDifficulty;
-      newBlock.blockHeader.nonce = findNonce(newBlock);
-      newBlock.hash = newBlock.computeHash();
-
-      TreeNode newBlockTreeNode = TreeNode(newBlock);
-
-      lastBlockTreeNode.appendAt(lastBlockTreeNode, newBlockTreeNode);
-      root!.getLevels();
-      newBlock.blockHeight = lastBlock.blockHeight! + 1;
+    for (int i = 0; i < 10; i++) {   
+      Block lastBlock = getLastBlock();
+      Block newBlock = mineNewBlock(lastBlock);
+      
+      //adding the new block to the blockchain
+      lastBlock.appendAt(lastBlock, newBlock);
+      
     }
 
-    root!.traverseDepthFirst((node) => print(node.block));
+    genesisBlock!.traverseDepthFirst((node) => print(node));
 
     // }
   }
 
-  //TODO: void difficultyRetargetting(Block lastBlock, Block newBlock) {}
+  Block mineNewBlock(Block lastBlock) {
+    Block newBlock = Block(
+      blockHeader: BlockHeader(
+        previousHash: lastBlock.hash!,
+        timestamp: DateTime.now(),
+      ),
+    );
+    int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
+    newBlock.blockHeader.difficulty = newDifficulty;
+    //newBlock.blockHeader.difficulty = 4;
+    newBlock.blockHeader.nonce = findNonce(newBlock);
+    newBlock.hash = newBlock.computeHash();
+    newBlock.blockHeight = lastBlock.blockHeight! + 1;
+    return newBlock;
+  }
+
+  Block getLastBlock() {
+    genesisBlock!.getLevels();
+    Block lastBlock = (genesisBlock!.getLastNodes()
+          ..sort((Block a, Block b) => (a)
+              .blockHeader
+              .timestamp
+              .compareTo((b).blockHeader.timestamp)))
+        .last;
+    return lastBlock;
+  }
+
+  int difficultyRetargetting(Block lastBlock, Block newBlock) {
+    int newDifficulty = lastBlock.blockHeader.difficulty!;
+    
+    Duration difference = newBlock.blockHeader.timestamp
+        .difference(lastBlock.blockHeader.timestamp);
+    Duration minRateDuration = Duration(seconds: minRate);
+    if (difference.compareTo(minRateDuration) < 0) {
+      newDifficulty += 1;
+    } else if (lastBlock.blockHeader.difficulty! - 1 > 0) {
+      //newDifficulty -= 1;
+      newDifficulty =((newDifficulty / difference.inSeconds.toInt()).ceil()).toInt();
+    }
+    return newDifficulty;
+  }
+
 
   void generateGenesisBlock() {
     genesisBlock = Block(
