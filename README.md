@@ -1,1 +1,1 @@
-A simple command-line application.
+Simulating blockchain and 51% attack using dart.
