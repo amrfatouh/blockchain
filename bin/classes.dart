@@ -220,6 +220,13 @@ class Blockchain {
     print(
         'Enter the number z, where z is how many blocks behind the last block from which the attack will start:');
     int? z = int.parse((stdin.readLineSync() ?? '3'));
+
+    if (countBeforeAttack <= z) {
+      print(
+          'error: number of legit blocks before attack can\'t be less than or equal to z');
+      return;
+    }
+
     print('Enter the computational power of the attacker (1 - 100):');
     int? compPower = int.parse((stdin.readLineSync() ?? '60'));
 
@@ -239,13 +246,13 @@ class Blockchain {
 
     generateGenesisBlock();
     honestLastBlock = genesisBlock!;
-    while (blockCount <= countBeforeAttack) {
+    while (blockCount < countBeforeAttack) {
       Block newBlock = mineNewBlock(honestLastBlock!);
       honestLastBlock.appendAt(honestLastBlock, newBlock);
       honestLastBlock = newBlock;
     }
     genesisBlock!.traverseDepthFirst((block) {
-      if (block.blockHeight == countBeforeAttack - z) {
+      if (block.blockHeight == countBeforeAttack - 1 - z) {
         attackerLastBlock = block;
       }
     });
@@ -269,12 +276,16 @@ class Blockchain {
     Duration attackElapsedTime =
         attackEndingTime.difference(attackBeginingTime);
 
+    print('');
+    print('Attack Results');
+    print('=' * 'Attack Results'.length);
     print('elapsed attack time: $attackElapsedTime');
     print('attacker speed: $compPower%');
     print('legit blockchain speed: ${100 - compPower}%');
-    print('count of legit blocks: ${honestLastBlock.blockHeight} blocks');
+    print('count of legit blocks: ${honestLastBlock.blockHeight! + 1} blocks');
     print(
-        'count of fraudulent blocks: ${attackerLastBlock!.blockHeight! - (countBeforeAttack - z)} blocks');
+        'count of fraudulent blocks: ${attackerLastBlock!.blockHeight! - (countBeforeAttack - z - 1)} blocks');
+    print('');
 
     // genesisBlock!.traverseDepthFirst((node) => print(node));
     // print('----------');
