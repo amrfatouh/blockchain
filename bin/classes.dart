@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
@@ -200,17 +201,38 @@ class Transaction {
 
 const minRate = 1;
 
-bool constantDifficulty = true;
-int z = 30;
-int countBeforeAttack = 40;
-int compPower = 30;
-
 class Blockchain {
   //this is the root block
   Block? genesisBlock;
   int blockCount = 0;
+  bool? constantDifficulty;
 
   Blockchain() {
+    print('Would you like difficulty to be constant? (y/n)');
+    constantDifficulty = stdin.readLineSync() == 'y';
+    int? constDiffValue;
+    if (constantDifficulty!) {
+      print('Enter the value of constant difficulty:');
+      constDiffValue = int.parse((stdin.readLineSync() ?? '4'));
+    }
+    print('Enter number of legit blocks before starting attack:');
+    int? countBeforeAttack = int.parse((stdin.readLineSync() ?? '10'));
+    print(
+        'Enter the number z, where z is how many blocks behind the last block from which the attack will start:');
+    int? z = int.parse((stdin.readLineSync() ?? '3'));
+    print('Enter the computational power of the attacker (1 - 100):');
+    int? compPower = int.parse((stdin.readLineSync() ?? '60'));
+
+    print('Input Data');
+    print('=' * 'Input Data'.length);
+    print('use constant difficulty: $constantDifficulty');
+    if (constantDifficulty!) {
+      print('constant difficulty value: $constDiffValue');
+    }
+    print('number of legit blocks before starting attack: $countBeforeAttack');
+    print('value of z: $z');
+    print('attacker computational power: $compPower%');
+
     Block? honestLastBlock;
     Block? attackerLastBlock;
     DateTime? attackBeginingTime;
@@ -233,8 +255,6 @@ class Blockchain {
       int num = Random().nextInt(99) + 1;
       if (num <= compPower) {
         print('ATTACKER BLOCK');
-        print(
-            'height difference: ${honestLastBlock.blockHeight! - attackerLastBlock!.blockHeight!}');
         Block attackerNewBlock = mineNewBlock(attackerLastBlock!);
         attackerLastBlock!.appendAt(attackerLastBlock, attackerNewBlock);
         attackerLastBlock = attackerNewBlock;
@@ -249,9 +269,12 @@ class Blockchain {
     Duration attackElapsedTime =
         attackEndingTime.difference(attackBeginingTime);
 
-    print('elapsed time: $attackElapsedTime');
+    print('elapsed attack time: $attackElapsedTime');
     print('attacker speed: $compPower%');
     print('legit blockchain speed: ${100 - compPower}%');
+    print('count of legit blocks: ${honestLastBlock.blockHeight} blocks');
+    print(
+        'count of fraudulent blocks: ${attackerLastBlock!.blockHeight! - (countBeforeAttack - z)} blocks');
 
     // genesisBlock!.traverseDepthFirst((node) => print(node));
     // print('----------');
@@ -277,7 +300,7 @@ class Blockchain {
         timestamp: DateTime.now(),
       ),
     );
-    if (constantDifficulty) {
+    if (constantDifficulty!) {
       newBlock.blockHeader.difficulty = 4;
     } else {
       int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
