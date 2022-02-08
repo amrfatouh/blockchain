@@ -4,8 +4,6 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 
-bool constantDifficulty = false;
-
 class Block {
   String? hash;
   int? blockHeight;
@@ -202,23 +200,72 @@ class Transaction {
 
 const minRate = 1;
 
+bool constantDifficulty = true;
+int z = 30;
+int countBeforeAttack = 40;
+int compPower = 30;
+
 class Blockchain {
   //this is the root block
   Block? genesisBlock;
   int blockCount = 0;
 
   Blockchain() {
-    generateGenesisBlock();
-    // while (true) {
-    for (int i = 0; i < 10; i++) {
-      Block lastBlock = getLastBlock();
-      Block newBlock = mineNewBlock(lastBlock);
+    Block? honestLastBlock;
+    Block? attackerLastBlock;
+    DateTime? attackBeginingTime;
 
-      //adding the new block to the blockchain
-      lastBlock.appendAt(lastBlock, newBlock);
+    generateGenesisBlock();
+    honestLastBlock = genesisBlock!;
+    while (blockCount <= countBeforeAttack) {
+      Block newBlock = mineNewBlock(honestLastBlock!);
+      honestLastBlock.appendAt(honestLastBlock, newBlock);
+      honestLastBlock = newBlock;
+    }
+    genesisBlock!.traverseDepthFirst((block) {
+      if (block.blockHeight == countBeforeAttack - z) {
+        attackerLastBlock = block;
+      }
+    });
+    attackBeginingTime = DateTime.now();
+
+    while (attackerLastBlock!.blockHeight! <= honestLastBlock!.blockHeight!) {
+      int num = Random().nextInt(99) + 1;
+      if (num <= compPower) {
+        print('ATTACKER BLOCK');
+        print(
+            'height difference: ${honestLastBlock.blockHeight! - attackerLastBlock!.blockHeight!}');
+        Block attackerNewBlock = mineNewBlock(attackerLastBlock!);
+        attackerLastBlock!.appendAt(attackerLastBlock, attackerNewBlock);
+        attackerLastBlock = attackerNewBlock;
+      } else {
+        Block honestNewBlock = mineNewBlock(honestLastBlock);
+        honestLastBlock.appendAt(honestLastBlock, honestNewBlock);
+        honestLastBlock = honestNewBlock;
+      }
     }
 
-    genesisBlock!.traverseDepthFirst((node) => print(node));
+    DateTime attackEndingTime = DateTime.now();
+    Duration attackElapsedTime =
+        attackEndingTime.difference(attackBeginingTime);
+
+    print('elapsed time: $attackElapsedTime');
+    print('attacker speed: $compPower%');
+    print('legit blockchain speed: ${100 - compPower}%');
+
+    // genesisBlock!.traverseDepthFirst((node) => print(node));
+    // print('----------');
+    // print(attackerLastBlock);
+    // print(honestLastBlock);
+
+    // while (true) {
+    // for (int i = 0; i < 10; i++) {
+    //   Block lastBlock = getLastBlock();
+    //   Block newBlock = mineNewBlock(lastBlock);
+
+    //   //adding the new block to the blockchain
+    //   lastBlock.appendAt(lastBlock, newBlock);
+    // }
 
     // }
   }
@@ -241,6 +288,7 @@ class Blockchain {
     newBlock.blockHeight = lastBlock.blockHeight! + 1;
 
     blockCount++;
+    print(newBlock);
     return newBlock;
   }
 
@@ -291,6 +339,8 @@ class Blockchain {
     genesisBlock!.transactionsList.clear();
     genesisBlock!.blockHeader.nonce = findNonce(genesisBlock!);
     genesisBlock!.hash = genesisBlock!.computeHash();
+    blockCount++;
+    print(genesisBlock);
   }
 
   @override
