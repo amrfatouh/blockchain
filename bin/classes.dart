@@ -206,11 +206,11 @@ class Blockchain {
   Block? genesisBlock;
   int blockCount = 0;
   bool? constantDifficulty;
-
+  int? constDiffValue;
   Blockchain() {
     print('Would you like difficulty to be constant? (y/n)');
     constantDifficulty = stdin.readLineSync() == 'y';
-    int? constDiffValue;
+    
     if (constantDifficulty!) {
       print('Enter the value of constant difficulty:');
       constDiffValue = int.parse((stdin.readLineSync() ?? '4'));
@@ -312,7 +312,7 @@ class Blockchain {
       ),
     );
     if (constantDifficulty!) {
-      newBlock.blockHeader.difficulty = 4;
+      newBlock.blockHeader.difficulty = constDiffValue; 
     } else {
       int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
       newBlock.blockHeader.difficulty = newDifficulty;
