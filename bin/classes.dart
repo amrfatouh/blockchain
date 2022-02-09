@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -28,18 +27,6 @@ class Block {
     var digest = sha256.convert(bytes);
     return digest.toString();
   }
-
-  // factory Block.generateGenesisBlock() {
-  //   int diffculty = 2;
-  //   int nonce = findNonce(this);
-  //   return Block(
-  //     blockHeader: BlockHeader(
-  //         difficulty: 2, previousHash: previousHash, timestamp: timestamp),
-  //     blockHeight: 0,
-  //     hash: "0" /* TODO: to be done */,
-  //     transactionsList: [],
-  //   );
-  // }
 
   @override
   String toString() {
