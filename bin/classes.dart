@@ -210,7 +210,7 @@ class Blockchain {
   Blockchain() {
     print('Would you like difficulty to be constant? (y/n)');
     constantDifficulty = stdin.readLineSync() == 'y';
-    
+
     if (constantDifficulty!) {
       print('Enter the value of constant difficulty:');
       constDiffValue = int.parse((stdin.readLineSync() ?? '4'));
@@ -229,6 +229,13 @@ class Blockchain {
 
     print('Enter the computational power of the attacker (1 - 100):');
     int? compPower = int.parse((stdin.readLineSync() ?? '60'));
+
+    print('Enter the computational power of the honest node A:');
+    int? compPowerForNodeA = int.parse((stdin.readLineSync() ?? '20'));
+    print('Enter the computational power of the honest node B:');
+    int? compPowerForNodeB = int.parse((stdin.readLineSync() ?? '10'));
+    print('Enter the computational power of the honest node C:');
+    int? compPowerForNodeC = int.parse((stdin.readLineSync() ?? '10'));
 
     print('Input Data');
     print('=' * 'Input Data'.length);
@@ -257,21 +264,96 @@ class Blockchain {
       }
     });
     attackBeginingTime = DateTime.now();
-
+    Block attackerNewBlock = configureNewBlock(attackerLastBlock!);
+    Block honestNewBlockA = configureNewBlock(honestLastBlock!);
+    Block honestNewBlockB = configureNewBlock(honestLastBlock);
+    Block honestNewBlockC = configureNewBlock(honestLastBlock);
+    bool honestNodeSolvesPuzzle = false;
     while (attackerLastBlock!.blockHeight! <= honestLastBlock!.blockHeight!) {
-      int num = Random().nextInt(99) + 1;
-      if (num <= compPower) {
+      //attacker's turn in the round robin
+      attackerNewBlock.blockHeader.nonce =
+          resumeNonceMining(attackerNewBlock, compPower);
+      if (isValidNonce(attackerNewBlock)) {
+        attackerNewBlock.hash = attackerNewBlock.computeHash();
+        attackerNewBlock.blockHeight = attackerLastBlock!.blockHeight! + 1;
+        blockCount++;
         print('ATTACKER BLOCK');
-        Block attackerNewBlock = mineNewBlock(attackerLastBlock!);
         attackerLastBlock!.appendAt(attackerLastBlock, attackerNewBlock);
         attackerLastBlock = attackerNewBlock;
-      } else {
-        Block honestNewBlock = mineNewBlock(honestLastBlock);
-        honestLastBlock.appendAt(honestLastBlock, honestNewBlock);
-        honestLastBlock = honestNewBlock;
+        print(attackerLastBlock);
+        attackerNewBlock = configureNewBlock(attackerLastBlock!);
+      }
+
+      //honest node A tun in round robin
+      if (!honestNodeSolvesPuzzle) {
+        honestNewBlockA.blockHeader.nonce =
+            resumeNonceMining(honestNewBlockA, compPowerForNodeA);
+        if (isValidNonce(honestNewBlockA)) {
+          honestNewBlockA.hash = honestNewBlockA.computeHash();
+          honestNewBlockA.blockHeight = honestLastBlock.blockHeight! + 1;
+          blockCount++;
+          print('NODE A BLOCK');
+          honestLastBlock.appendAt(honestLastBlock, honestNewBlockA);
+          honestLastBlock = honestNewBlockA;
+          print(honestLastBlock);
+          honestNodeSolvesPuzzle = true;
+        }
+      }
+
+        //honest node B tun in round robin
+      if (!honestNodeSolvesPuzzle) {
+        honestNewBlockB.blockHeader.nonce =
+            resumeNonceMining(honestNewBlockB, compPowerForNodeB);
+        if (isValidNonce(honestNewBlockB)) {
+          honestNewBlockB.hash = honestNewBlockB.computeHash();
+          honestNewBlockB.blockHeight = honestLastBlock.blockHeight! + 1;
+          blockCount++;
+          print('NODE B BLOCK');
+          honestLastBlock.appendAt(honestLastBlock, honestNewBlockB);
+          honestLastBlock = honestNewBlockB;
+          print(honestLastBlock);
+          honestNodeSolvesPuzzle = true;
+        }
+      }
+
+          //honest node C tun in round robin
+      if (!honestNodeSolvesPuzzle) {
+        honestNewBlockC.blockHeader.nonce =
+            resumeNonceMining(honestNewBlockC, compPowerForNodeC);
+        if (isValidNonce(honestNewBlockC)) {
+          honestNewBlockC.hash = honestNewBlockC.computeHash();
+          honestNewBlockC.blockHeight = honestLastBlock.blockHeight! + 1;
+          blockCount++;
+          print('NODE C BLOCK');
+          honestLastBlock.appendAt(honestLastBlock, honestNewBlockC);
+          honestLastBlock = honestNewBlockC;
+          print(honestLastBlock);
+          honestNodeSolvesPuzzle = true;
+        }
+      }
+
+      //configuring honest block node
+      if (honestNodeSolvesPuzzle) {
+        honestNewBlockA = configureNewBlock(honestLastBlock);
+        honestNewBlockB = configureNewBlock(honestLastBlock);
+        honestNewBlockC = configureNewBlock(honestLastBlock);
+        honestNodeSolvesPuzzle = false;
       }
     }
 
+    // while (attackerLastBlock!.blockHeight! <= honestLastBlock!.blockHeight!) {
+    //     // int num = Random().nextInt(99) + 1;
+    //     if (num <= compPower) {
+    //       print('ATTACKER BLOCK');
+    //       Block attackerNewBlock = mineNewBlock(attackerLastBlock!);
+    //       attackerLastBlock!.appendAt(attackerLastBlock, attackerNewBlock);
+    //       attackerLastBlock = attackerNewBlock;
+    //     } else {
+    //       Block honestNewBlock = mineNewBlock(honestLastBlock);
+    //       honestLastBlock.appendAt(honestLastBlock, honestNewBlock);
+    //       honestLastBlock = honestNewBlock;
+    //     }
+    //   }
     DateTime attackEndingTime = DateTime.now();
     Duration attackElapsedTime =
         attackEndingTime.difference(attackBeginingTime);
@@ -279,6 +361,7 @@ class Blockchain {
     print('');
     print('Attack Results');
     print('=' * 'Attack Results'.length);
+    print('Z: $z');
     print('elapsed attack time: $attackElapsedTime');
     print('attacker speed: $compPower%');
     print('legit blockchain speed: ${100 - compPower}%');
@@ -303,6 +386,47 @@ class Blockchain {
 
     // }
   }
+  Block configureNewBlock(Block lastBlock) {
+    Block newBlock = Block(
+      blockHeader: BlockHeader(
+        previousHash: lastBlock.hash!,
+        timestamp: DateTime.now(),
+      ),
+    );
+    if (constantDifficulty!) {
+      newBlock.blockHeader.difficulty = constDiffValue;
+    } else {
+      int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
+      newBlock.blockHeader.difficulty = newDifficulty;
+    }
+    newBlock.blockHeader.nonce = 0;
+    //you must set the block height before appending it
+    return newBlock;
+  }
+
+  int resumeNonceMining(Block block, int trialsCount) {
+    int n = 0;
+    String computedHash = block.computeHash();
+    String binaryHash = computedHash.toBin();
+    while ((!binaryHash.startsWith('0' * block.blockHeader.difficulty!)) &&
+        (n < trialsCount)) {
+      block.blockHeader.nonce += 1;
+      computedHash = block.computeHash();
+      binaryHash = computedHash.toBin();
+      n++;
+    }
+    return block.blockHeader.nonce;
+  }
+
+  bool isValidNonce(Block block) {
+    String computedHash = block.computeHash();
+    String binaryHash = computedHash.toBin();
+    if (binaryHash.startsWith('0' * block.blockHeader.difficulty!)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
 
   Block mineNewBlock(Block lastBlock) {
     Block newBlock = Block(
@@ -312,7 +436,7 @@ class Blockchain {
       ),
     );
     if (constantDifficulty!) {
-      newBlock.blockHeader.difficulty = constDiffValue; 
+      newBlock.blockHeader.difficulty = constDiffValue;
     } else {
       int newDifficulty = difficultyRetargetting(lastBlock, newBlock);
       newBlock.blockHeader.difficulty = newDifficulty;
