@@ -213,8 +213,8 @@ class Blockchain {
           'error: number of legit blocks before attack can\'t be less than or equal to z');
       return;
     }
-
-    print('Enter the computational power of the attacker (1 - 100):');
+    
+    print('Enter the computational power of the attacker:');
     int? compPower = int.parse((stdin.readLineSync() ?? '60'));
 
     print('Enter the computational power of the honest node A:');
@@ -223,7 +223,18 @@ class Blockchain {
     int? compPowerForNodeB = int.parse((stdin.readLineSync() ?? '10'));
     print('Enter the computational power of the honest node C:');
     int? compPowerForNodeC = int.parse((stdin.readLineSync() ?? '10'));
-
+    double attackerComputationalPower = compPower/(compPower+compPowerForNodeA+compPowerForNodeB+compPowerForNodeC);
+    attackerComputationalPower *=100;
+    var powerList = [compPower,compPowerForNodeA,compPowerForNodeB,compPowerForNodeC];
+    var cdf=[];
+    cdf.add(powerList[0]);
+    for (int i =1;i<powerList.length;++i) {
+      cdf.add(cdf[i-1]+powerList[i]);
+    }
+    var sum=0;
+    for (var item in powerList) {
+      sum+=item;
+    }
     print('Input Data');
     print('=' * 'Input Data'.length);
     print('use constant difficulty: $constantDifficulty');
@@ -232,7 +243,7 @@ class Blockchain {
     }
     print('number of legit blocks before starting attack: $countBeforeAttack');
     print('value of z: $z');
-    print('attacker computational power: $compPower%');
+    print('attacker computational power: $attackerComputationalPower%');
 
     Block? honestLastBlock;
     Block? attackerLastBlock;
@@ -257,9 +268,14 @@ class Blockchain {
     Block honestNewBlockC = configureNewBlock(honestLastBlock);
     bool honestNodeSolvesPuzzle = false;
     while (attackerLastBlock!.blockHeight! <= honestLastBlock!.blockHeight!) {
+      int val= Random().nextInt(sum) %sum;
+      int turn=0;
+      for(turn=0;turn<4&&val>cdf[turn];++turn){}
+      
       //attacker's turn in the round robin
+      if(turn==0){
       attackerNewBlock.blockHeader.nonce =
-          resumeNonceMining(attackerNewBlock, compPower);
+          resumeNonceMining(attackerNewBlock, 1);
       if (isValidNonce(attackerNewBlock)) {
         attackerNewBlock.hash = attackerNewBlock.computeHash();
         attackerNewBlock.blockHeight = attackerLastBlock!.blockHeight! + 1;
@@ -270,11 +286,11 @@ class Blockchain {
         print(attackerLastBlock);
         attackerNewBlock = configureNewBlock(attackerLastBlock!);
       }
-
+      }
       //honest node A tun in round robin
-      if (!honestNodeSolvesPuzzle) {
+      if (!honestNodeSolvesPuzzle && turn==1) {
         honestNewBlockA.blockHeader.nonce =
-            resumeNonceMining(honestNewBlockA, compPowerForNodeA);
+            resumeNonceMining(honestNewBlockA, 1);
         if (isValidNonce(honestNewBlockA)) {
           honestNewBlockA.hash = honestNewBlockA.computeHash();
           honestNewBlockA.blockHeight = honestLastBlock.blockHeight! + 1;
@@ -284,13 +300,20 @@ class Blockchain {
           honestLastBlock = honestNewBlockA;
           print(honestLastBlock);
           honestNodeSolvesPuzzle = true;
+          //configuring honest block node
+          if (honestNodeSolvesPuzzle) {
+            honestNewBlockA = configureNewBlock(honestLastBlock);
+            honestNewBlockB = configureNewBlock(honestLastBlock);
+            honestNewBlockC = configureNewBlock(honestLastBlock);
+            honestNodeSolvesPuzzle = false;
+          }
         }
       }
 
-        //honest node B tun in round robin
-      if (!honestNodeSolvesPuzzle) {
+      //honest node B tun in round robin
+      if (!honestNodeSolvesPuzzle && turn==2) {
         honestNewBlockB.blockHeader.nonce =
-            resumeNonceMining(honestNewBlockB, compPowerForNodeB);
+            resumeNonceMining(honestNewBlockB, 1);
         if (isValidNonce(honestNewBlockB)) {
           honestNewBlockB.hash = honestNewBlockB.computeHash();
           honestNewBlockB.blockHeight = honestLastBlock.blockHeight! + 1;
@@ -300,13 +323,20 @@ class Blockchain {
           honestLastBlock = honestNewBlockB;
           print(honestLastBlock);
           honestNodeSolvesPuzzle = true;
+          //configuring honest block node
+          if (honestNodeSolvesPuzzle) {
+            honestNewBlockA = configureNewBlock(honestLastBlock);
+            honestNewBlockB = configureNewBlock(honestLastBlock);
+            honestNewBlockC = configureNewBlock(honestLastBlock);
+            honestNodeSolvesPuzzle = false;
+          }
         }
       }
 
-          //honest node C tun in round robin
-      if (!honestNodeSolvesPuzzle) {
+      //honest node C tun in round robin
+      if (!honestNodeSolvesPuzzle && turn==3) {
         honestNewBlockC.blockHeader.nonce =
-            resumeNonceMining(honestNewBlockC, compPowerForNodeC);
+            resumeNonceMining(honestNewBlockC, 1);
         if (isValidNonce(honestNewBlockC)) {
           honestNewBlockC.hash = honestNewBlockC.computeHash();
           honestNewBlockC.blockHeight = honestLastBlock.blockHeight! + 1;
@@ -316,15 +346,14 @@ class Blockchain {
           honestLastBlock = honestNewBlockC;
           print(honestLastBlock);
           honestNodeSolvesPuzzle = true;
+          //configuring honest block node
+          if (honestNodeSolvesPuzzle) {
+            honestNewBlockA = configureNewBlock(honestLastBlock);
+            honestNewBlockB = configureNewBlock(honestLastBlock);
+            honestNewBlockC = configureNewBlock(honestLastBlock);
+            honestNodeSolvesPuzzle = false;
+          }
         }
-      }
-
-      //configuring honest block node
-      if (honestNodeSolvesPuzzle) {
-        honestNewBlockA = configureNewBlock(honestLastBlock);
-        honestNewBlockB = configureNewBlock(honestLastBlock);
-        honestNewBlockC = configureNewBlock(honestLastBlock);
-        honestNodeSolvesPuzzle = false;
       }
     }
 
@@ -348,10 +377,11 @@ class Blockchain {
     print('');
     print('Attack Results');
     print('=' * 'Attack Results'.length);
+    print('number of legit blocks before starting attack: $countBeforeAttack');
     print('Z: $z');
     print('elapsed attack time: $attackElapsedTime');
-    print('attacker speed: $compPower%');
-    print('legit blockchain speed: ${100 - compPower}%');
+    print('attacker speed: $attackerComputationalPower%');
+    print('legit blockchain speed: ${100 - attackerComputationalPower}%');
     print('count of legit blocks: ${honestLastBlock.blockHeight! + 1} blocks');
     print(
         'count of fraudulent blocks: ${attackerLastBlock!.blockHeight! - (countBeforeAttack - z - 1)} blocks');
